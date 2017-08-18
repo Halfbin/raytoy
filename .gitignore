@@ -1,0 +1,10 @@
+obj/
+debug/
+profile/
+release/
+*.jpg
+*.ppm
+gmon.out
+*.make
+Makefile
+
