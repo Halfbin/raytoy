@@ -447,7 +447,7 @@ namespace RT {
 
   class Glass : public Material {
   public:
-    Glass () : Material ({0,0,0}, {1,1,1}) { }
+    Glass () : Material ({0,0,0}, {0.6f,1.0f,0.8f}) { }
 
     Vector bounceSpecular (RandBits& rng, Vector incident) const {
       float const
@@ -461,7 +461,7 @@ namespace RT {
         return reflection;
 
       float const
-        eta = 1.7f,
+        eta = 1.458f,
         r = (incident.z>0.f)? eta : (1.f/eta),
         discrim = 1.f - r*r*(1.f - c*c);
       /*if (discrim < 0.f)
@@ -673,12 +673,14 @@ namespace RT {
     float const limitQd;
     size_t n;
     Element* elems;
+    Vector normal;
 
   public:
     NearSet (NearSet const&) = delete;
 
     NearSet (size_t cap, float limitQd) :
-      cap (cap), limitQd (limitQd), n (0), elems (new Element[cap])
+      cap (cap), limitQd (limitQd), n (0), elems (new Element[cap]),
+      normal {0,0,0}
     { }
 
     ~NearSet () {
@@ -701,6 +703,8 @@ namespace RT {
     }
 
     void insert (float qd, Photon photon) {
+      if (-dot (photon.incoming (), normal) < 0.f)
+        return;
       if (!full ()) {
         elems[n++] = { qd, photon };
         if (full ())
@@ -713,7 +717,9 @@ namespace RT {
       }
     }
 
-    void recycle (Point newPos) {
+    void prepare (Point newPos, Vector newNormal) {
+      normal = newNormal;
+
       if (!full ()) {
         clear ();
         return;
@@ -782,8 +788,8 @@ namespace RT {
     }
   }
 
-  void nearestPhotons (NearSet& nears, PhotonMap const& map, Point pos) {
-    nears.recycle (pos);
+  void nearestPhotons (NearSet& nears, PhotonMap const& map, Point pos, Vector normal) {
+    nears.prepare (pos, normal);
     auto* ptr = map.array.data ();
     findNearestPhotons (ptr, ptr + map.array.size (), pos, nears);
   }
@@ -996,10 +1002,10 @@ namespace RT {
 
   Colour indirectTerm (RayHit hit, NearSet& nears, PhotonMap const& map) {
     constexpr float const
-      filterK = 10.f,
+      filterK = 1.f,
       normalizeFilter = 1.f - 2.f / (3.f * filterK);
 
-    nearestPhotons (nears, map, hit.position);
+    nearestPhotons (nears, map, hit.position, hit.normal);
     float const radius = std::sqrt (nears.maxQd ());
     //fprintf (stderr, "radius %f\n", radius);
 
@@ -1275,10 +1281,10 @@ int main () {
 
   Options opts;
   opts.indirect = true;
-  opts.sqrtNSamples = 5;
-  opts.nPhotons = 2'000'000;
-  opts.nNears = 500;
-  opts.nearLimit = 0.4f;
+  opts.sqrtNSamples = 4;
+  opts.nPhotons = 200'000;
+  opts.nNears = 100;
+  opts.nearLimit = 0.3f;
   render (opts, im);
 
   fprintf (stderr, "Done\n");
