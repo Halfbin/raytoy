@@ -8,7 +8,7 @@ namespace RT {
   using RandBits = std::mt19937;
   static std::uniform_real_distribution<float> canon (0.f, 1.f);
 
-  RandBits threadRNG ();
+  RandBits threadRNG (int seed = 1234);
 
   Vector lambert       (RandBits&);
   Vector spherical     (RandBits&);

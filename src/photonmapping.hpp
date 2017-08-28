@@ -11,21 +11,10 @@ namespace RT {
     , RayHit<const Item*> hit
     );
 
-  void castPhotons
+  int castPhotons
     ( RandBits& rng
     , Scene const& scene
     , Photon* photons, Photon* end
-    );
-
-  Photon* tracePhoton
-    ( RandBits& rng
-    , Scene const& scene
-    , Ray ray
-    , Item const*
-    , Colour power
-    , int ttl
-    , Photon* photons, Photon* end
-    , bool indirect = false
     );
 }
 

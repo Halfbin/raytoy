@@ -5,12 +5,13 @@
 #include "basis.hpp"
 
 #include <cassert>
+#include <algorithm>
+#include <cfloat>
 
 namespace RT {
   static void addPhoton (PathNode& node, Photon photon) {
-    Basis const tang = Basis::fromK (node.normal);
-    node.tau += photon.power () * node.material->brdfDiffuse
-      (node.incident, tang.into (photon.incoming ()));
+    float const cosine = std::max (0.f, -dot (photon.incoming (), node.normal));
+    node.tau += photon.power () * cosine * node.matDiffuse;
   }
 
   static int addPhotonsInRadius
@@ -18,47 +19,61 @@ namespace RT {
     , PathNode& node
     )
   {
-    if (begin == end)
-      return 0;
-
-    Photon const* mid = begin + (end - begin) / 2;
-    float const qd = norm2 (node.position - mid->position ());
-
-    float planeDist = inf;
-    switch (mid->split) {
-      case Axis::X: planeDist = node.position.x - mid->x; break;
-      case Axis::Y: planeDist = node.position.y - mid->y; break;
-      case Axis::Z: planeDist = node.position.z - mid->z; break;
-      default: assert (false); //"tried to treat photon map leaf as node!"
-    }
-
-    float const planeQd = planeDist * planeDist;
-
     int added = 0;
-    if (node.radius2 > qd) {
-      addPhoton (node, *mid);
-      added++;
+
+    float const r2 = node.radius * node.radius;
+
+    if (end - begin < 16) {
+      for (Photon const* photon = begin; photon != end; photon++) {
+        float const qd = norm2 (node.position - photon->position ());
+        if (qd < r2) {
+          addPhoton (node, *photon);
+          added++;
+        }
+      }
     }
-    if (planeDist > 0.f || node.radius2 > planeQd)
-      added += addPhotonsInRadius (mid+1, end, node);
-    if (planeDist < 0.f || node.radius2 > planeQd)
-      added += addPhotonsInRadius (begin, mid, node);
+    else {
+      Photon const* mid = begin + (end - begin) / 2;
+      float const qd = norm2 (node.position - mid->position ());
+
+      float planeDist = inf;
+      switch (mid->split) {
+        case Axis::X: planeDist = node.position.x - mid->x; break;
+        case Axis::Y: planeDist = node.position.y - mid->y; break;
+        case Axis::Z: planeDist = node.position.z - mid->z; break;
+        default: assert (false); //"tried to treat photon map leaf as node!"
+      }
+
+      if (qd < r2) {
+        addPhoton (node, *mid);
+        added++;
+      }
+      if (planeDist > 0.f || node.radius > planeDist)
+        added += addPhotonsInRadius (mid+1, end, node);
+      if (planeDist < 0.f || node.radius > planeDist)
+        added += addPhotonsInRadius (begin, mid, node);
+    }
+
     return added;
   }
 
   void PathNode::update (PhotonMap const& map, float alpha) {
     int const
-      dn = addPhotonsInRadius (map.begin (), map.end (), *this),
-      adn = (int) (alpha * dn);
+      dn = addPhotonsInRadius (map.begin (), map.end (), *this);
+    if (dn == 0)
+      return;
 
-    if (dn > 0) {
-      float const ratio
-        = (float) (nPhotons + adn)
-        / (float) (nPhotons +  dn);
-      radius2 *= ratio;
-      tau     *= ratio;
-    }
-    nPhotons += adn;
+    float const ratio
+      = ((float)  nPhotons + alpha * dn)
+      /  (float) (nPhotons +         dn);
+
+    //fprintf (stderr, "r: %f, rat: %f\n", radius, ratio);
+    radius *= std::sqrt (ratio);
+  //radius = std::max (radius, limit);
+    if (radius == 0.f || ratio >= 1.f)
+      fprintf (stderr, "ugh\n");
+    tau *= ratio;
+    nPhotons += (int) (alpha * dn);
   }
 }
 

@@ -21,6 +21,7 @@ namespace RT {
 
     Colour brdfDiffuse (Vector, Vector) const;
     Interaction interact (RandBits&, Vector, Colour ci) const;
+    Colour correctRefl (Interaction::Type, Colour ci) const;
 
     Vector bounce (RandBits&, Interaction::Type, Vector incident) const;
 

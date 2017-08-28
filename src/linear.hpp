@@ -6,18 +6,18 @@
 namespace RT {
   struct Vector {
     union {
-      float components[4];
-      struct { float x, y, z, w; };
+      float components[3];
+      struct { float x, y, z; };
     };
 
     constexpr Vector ()
-      : x(0), y(0), z(0), w(0) { }
-    constexpr Vector (float x, float y, float z, float=0)
-      : x(x), y(y), z(z), w(0) { }
+      : x(0), y(0), z(0) { }
+    constexpr Vector (float x, float y, float z)
+      : x(x), y(y), z(z) { }
     Vector (Vector const&) = default;
 
     bool operator== (Vector const& other) const
-      { return x==other.x && y==other.y && z==other.z && w==other.w; }
+      { return x==other.x && y==other.y && z==other.z; }
     bool operator!= (Vector const& other) const
       { return !(*this == other); }
   };
@@ -26,35 +26,35 @@ namespace RT {
 
   struct Point {
     union {
-      float components[4];
-      struct { float x, y, z, w; };
+      float components[3];
+      struct { float x, y, z; };
     };
 
     constexpr Point ()
-      : x(0), y(0), z(0), w(1) { }
-    constexpr Point (float x, float y, float z, float=1)
-      : x(x), y(y), z(z), w(1) { }
+      : x(0), y(0), z(0) { }
+    constexpr Point (float x, float y, float z)
+      : x(x), y(y), z(z) { }
     Point (Point const&) = default;
   };
 
   static inline Vector operator+ (Vector a, Vector b)
-    { return { a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w }; }
+    { return { a.x+b.x, a.y+b.y, a.z+b.z }; }
   static inline Point  operator+ (Point p,  Vector d)
-    { return { p.x+d.x, p.y+d.y, p.z+d.z, p.w+d.w }; }
+    { return { p.x+d.x, p.y+d.y, p.z+d.z }; }
   static inline Point  operator- (Point p,  Vector d)
-    { return { p.x-d.x, p.y-d.y, p.z-d.z, p.w-d.w }; }
+    { return { p.x-d.x, p.y-d.y, p.z-d.z }; }
   static inline Vector operator- (Point p,  Point  q)
-    { return { p.x-q.x, p.y-q.y, p.z-q.z, p.w-q.w }; }
+    { return { p.x-q.x, p.y-q.y, p.z-q.z }; }
   static inline Vector operator- (Vector a, Vector b)
-    { return { a.x-b.x, a.y-b.y, a.z-b.z, a.w-b.w }; }
+    { return { a.x-b.x, a.y-b.y, a.z-b.z }; }
   static inline Vector operator* (Vector a, Vector b)
-    { return { a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w }; }
+    { return { a.x*b.x, a.y*b.y, a.z*b.z }; }
 
   static inline Vector operator* (float k, Vector v)
-    { return { k*v.x, k*v.y, k*v.z, k*v.w }; }
+    { return { k*v.x, k*v.y, k*v.z }; }
   static inline Vector operator* (Vector v, float k) { return k*v; }
 
-  static inline Vector operator- (Vector v) { return { -v.x, -v.y, -v.z, -v.w }; }
+  static inline Vector operator- (Vector v) { return { -v.x, -v.y, -v.z }; }
 
   static inline float dot (Vector a, Vector b)
     { return a.x*b.x + a.y*b.y + a.z*b.z; }

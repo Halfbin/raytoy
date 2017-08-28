@@ -10,19 +10,19 @@ project "raytoy"
 
   -- includedirs { "rk-core/include", "rk-math/include" }
   -- links { "c++abi", "c++" }
-  links { "pthread" }
+  links { "pthread", "SDL2" }
 
   warnings "Extra"
 
   filter "configurations:debug"
     defines { "DEBUG" }
-    buildoptions { "-Og" }
+  --buildoptions { "-Og" }
     symbols "On"
 
   filter "configurations:release"
     defines { "NDEBUG" }
-    --optimize "Speed"
-    buildoptions { "-flto", "-Ofast" }
+  --optimize "Speed"
+    buildoptions { "-flto", "-O3", "-march=core-avx2" }
 
   filter "configurations:profile"
     defines { "NDEBUG" }

@@ -5,11 +5,11 @@
 #include <thread>
 
 namespace RT {
-  RandBits threadRNG () {
+  RandBits threadRNG (int extra) {
     auto const id = std::this_thread::get_id ();
     std::hash<std::thread::id> threadHasher;
     auto const seed = uint_fast32_t (threadHasher (id));
-    return RandBits (seed);
+    return RandBits (seed ^ extra);
   }
 
   Vector lambert (RandBits& rng) {

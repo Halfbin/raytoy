@@ -20,7 +20,7 @@ namespace RT {
   Ray Sphere::randomEmission (RandBits& rng) const {
     Vector const normal = spherical (rng);
     Point const origin = centre + radius * normal;
-    Vector const dir = hemispherical (rng);
+    Vector const dir = lambert (rng);
     Basis const tang = Basis::fromK (normal);
     return Ray (origin, tang.outOf (dir));
   }
@@ -59,12 +59,13 @@ namespace RT {
       t     = dot (def,    abcxjkl ) / -denom;
     if (beta < 0.f || gamma < 0.f || (beta+gamma) > 1.f)
       return { };
-    return { r.at(t), t, basis.k, this };
+    Vector const n = (r.disp.z < 0.f)? basis.k : -basis.k;
+    return { r.at(t), t, n, this };
   }
 
   Ray Triangle::randomEmission (RandBits& rng) const {
     Point const origin = randomPoint (rng, {0,0,0});
-    Vector const dir = hemispherical (rng);
+    Vector const dir = lambert (rng);
     Vector const disp = basis.outOf (dir);
     /*fprintf (stderr, "emitted photon along (%f %f %f)\n",
       disp.x, disp.y, disp.z);*/

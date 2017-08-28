@@ -2,6 +2,7 @@
 
 #include "colour.hpp"
 
+#include <vector>
 #include <cstdint>
 #include <cmath>
 
@@ -29,11 +30,14 @@ namespace RT {
     std::vector<Pixel<X>> pixels;
 
   public:
+    Image ()
+      : wide (0), high (0)
+    { }
     Image (int w, int h)
       : wide (w), high (h)
       , pixels (size (), black)
     { }
-  /*Image (Image&& other)
+    Image (Image&& other)
       : wide (std::exchange (other.wide, 0))
       , high (std::exchange (other.high, 0))
       , pixels (std::move (other.pixels))
@@ -43,14 +47,29 @@ namespace RT {
       high = std::exchange (other.high, 0);
       pixels = std::move (other.pixels);
       return *this;
-    }*/
-    Image (Image const&) = delete;
-    Image& operator = (Image const&) = delete;
+    }
+    Image (Image const& other)
+      : wide (other.wide), high (other.high)
+      , pixels (other.pixels)
+    { }
+    Image& operator = (Image const& other) {
+      clear ();
+      wide = other.wide; high = other.high;
+      pixels = other.pixels;
+      return *this;
+    }
+
+    void clear () {
+      wide = 0; high = 0;
+      pixels.clear ();
+    }
 
     int width  () const { return wide; }
     int height () const { return high; }
     size_t size () const { return wide * high; }
+
     Pixel<X> const* raw () const { return pixels.data (); }
+
     Pixel<X>& at (int x, int y)       { return pixels [y * wide + x]; }
     Pixel<X>  at (int x, int y) const { return pixels [y * wide + x]; }
   };
@@ -67,7 +86,7 @@ namespace RT {
     return onto;
   }
 
-  float toSRGB1 (float raw) {
+  static inline float toSRGB1 (float raw) {
     float const
       c = std::max (0.f, std::min (1.f, raw)),
       lo = 12.92f*c,
@@ -75,11 +94,11 @@ namespace RT {
     return (c <= 0.0031308)? lo : hi;
   }
 
-  uint8_t toU8 (float x) {
+  static inline uint8_t toU8 (float x) {
     return uint8_t (255.f * x);
   }
 
-  Pixel<uint8_t> toSRGB (Pixel<float> c) {
+  static inline Pixel<uint8_t> toSRGB (Pixel<float> c) {
     return
       { toU8 (toSRGB1 (c.r))
       , toU8 (toSRGB1 (c.g))

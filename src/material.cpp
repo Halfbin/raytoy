@@ -9,19 +9,31 @@ namespace RT {
     float const
       pDiffuse  = max (kDiffuse *ci) / max (ci),
       pSpecular = max (kSpecular*ci) / max (ci),
-    //pAbsorb   = 1.f - pDiffuse - pSpecular,
       xi = canon (rng);
 
+    Interaction::Type ty = Interaction::Type::absorbed;
     if (xi < pDiffuse)
-      return { Interaction::Type::diffuse, kDiffuse / pDiffuse };
+      ty = Interaction::Type::diffuse;
     else if (xi - pDiffuse < pSpecular)
-      return { Interaction::Type::specular, kSpecular / pSpecular };
-    else
-      return { Interaction::Type::absorbed, {0,0,0} };
+      ty = Interaction::Type::specular;
+
+    return { ty, correctRefl (ty, ci) };
+  }
+
+  Colour Material::correctRefl (Interaction::Type ty, Colour ci) const {
+    float const
+      pDiffuse  = max (kDiffuse *ci) / max (ci),
+      pSpecular = max (kSpecular*ci) / max (ci);
+
+    switch (ty) {
+      case Interaction::Type::diffuse: return kDiffuse / pDiffuse;
+      case Interaction::Type::specular: return kSpecular / pSpecular;
+      case Interaction::Type::absorbed: return {0,0,0};
+    }
   }
 
   Colour Material::brdfDiffuse (Vector, Vector in) const {
-    return kDiffuse * std::max (0.f, in.z);
+    return kDiffuse * std::max (0.f, -in.z);
   }
 
   Vector Material::bounce
