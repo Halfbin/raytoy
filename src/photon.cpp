@@ -4,8 +4,13 @@
 #include "math.hpp"
 
 #include <cassert>
+#include <limits>
 
 namespace RT {
+  constexpr int const
+    rgbeScale = std::numeric_limits<RGBE::Component>::max(),
+    rgbeBias = rgbeScale / 2;
+
   RGBE::RGBE (Colour c) {
     int re, ge, be;
     float const
@@ -13,26 +18,26 @@ namespace RT {
       gm = std::frexp (c.g, &ge),
       bm = std::frexp (c.b, &be);
 
-    int maxExp = -128;
+    int maxExp = -rgbeBias;
     if (rm != 0.f) maxExp = re;
     if (gm != 0.f) maxExp = std::max (maxExp, ge);
     if (bm != 0.f) maxExp = std::max (maxExp, be);
-    if (maxExp == -128) maxExp = 0;
+    if (maxExp == -rgbeBias) maxExp = 0;
 
-    r = (uint8_t) ((int) (rm * 255.f) >> (maxExp - re));
-    g = (uint8_t) ((int) (gm * 255.f) >> (maxExp - ge));
-    b = (uint8_t) ((int) (bm * 255.f) >> (maxExp - be));
-    e = (uint8_t) (128 + maxExp);
+    r = (RGBE::Component) ((int) (rm * (float) rgbeScale) >> (maxExp - re));
+    g = (RGBE::Component) ((int) (gm * (float) rgbeScale) >> (maxExp - ge));
+    b = (RGBE::Component) ((int) (bm * (float) rgbeScale) >> (maxExp - be));
+    e = (RGBE::Component) (rgbeBias + maxExp);
     /*fprintf (stderr, "(%f %f %f) -> (%3i %3i %3i | %3i)\n",
       c.r, c.g, c.b, (int) r, (int) b, (int) g, (int) e);*/
   }
 
   RGBE::operator Colour () const {
-    int const exp = (int) e - 128;
+    int const exp = (int) e - rgbeBias;
     Colour const c
-      { std::scalbn ((int) r / 255.f, exp)
-      , std::scalbn ((int) g / 255.f, exp)
-      , std::scalbn ((int) b / 255.f, exp)
+      { std::scalbn ((int) r / (float) rgbeScale, exp)
+      , std::scalbn ((int) g / (float) rgbeScale, exp)
+      , std::scalbn ((int) b / (float) rgbeScale, exp)
       };
     /*fprintf (stderr, "(%f %f %f) <- (%3i %3i %3i | %3i)\n",
       c.r, c.g, c.b, (int) r, (int) b, (int) g, (int) e);*/
@@ -43,8 +48,11 @@ namespace RT {
     return (f >= 0.f)? 1.f : -1.f;
   }
 
-  static int8_t toByte (float f) {
-    return ((int) (f * 127.f));
+  static constexpr float const
+    octoScale = (float) std::numeric_limits<Octo::Component>::max ();
+
+  static Octo::Component toComponent (float f) {
+    return (int) (f * octoScale);
   }
 
   Octo::Octo (Vector v) {
@@ -57,15 +65,15 @@ namespace RT {
       py = v.y * k;
 
     if (v.z > 0.f) {
-      s = toByte (px);
-      t = toByte (py);
+      s = toComponent (px);
+      t = toComponent (py);
     }
     else {
       float const
         sf = (1.f - abs (py)) * signumNZ (px),
         tf = (1.f - abs (px)) * signumNZ (py);
-      s = toByte (sf);
-      t = toByte (tf);
+      s = toComponent (sf);
+      t = toComponent (tf);
     }
     /*fprintf (stderr, "(%f %f %f) -> (%i %i)\n",
       v.x, v.y, v.z, (int) s, (int) t);*/
@@ -75,8 +83,8 @@ namespace RT {
     using std::abs;
 
     float const
-      sf = ((int) s) / 127.f,
-      tf = ((int) t) / 127.f,
+      sf = ((int) s) / octoScale,
+      tf = ((int) t) / octoScale,
       z = 1.f - abs (sf) - abs (tf);
 
     Vector v;
@@ -116,15 +124,15 @@ namespace RT {
     switch (split) {
       case Axis::X:
         std::sort (begin, end, [] (auto const& a, auto const& b)
-          { return a.x < b.x; });
+          { return a.position.x < b.position.x; });
         break;
       case Axis::Y:
         std::sort (begin, end, [] (auto const& a, auto const& b)
-          { return a.y < b.y; });
+          { return a.position.y < b.position.y; });
         break;
       case Axis::Z:
         std::sort (begin, end, [] (auto const& a, auto const& b)
-          { return a.z < b.z; });
+          { return a.position.z < b.position.z; });
         break;
       default:
         assert (false);
@@ -135,9 +143,9 @@ namespace RT {
     Vector newMins = mins,
            newMaxs = maxs;
     switch (split) {
-      case Axis::X: newMins.x = newMaxs.x = median->x; break;
-      case Axis::Y: newMins.y = newMaxs.y = median->y; break;
-      case Axis::Z: newMins.z = newMaxs.z = median->z; break;
+      case Axis::X: newMins.x = newMaxs.x = median->position.x; break;
+      case Axis::Y: newMins.y = newMaxs.y = median->position.y; break;
+      case Axis::Z: newMins.z = newMaxs.z = median->position.z; break;
       default: assert (false);
     }
 
@@ -150,12 +158,12 @@ namespace RT {
   {
     Vector mins {inf,inf,inf}, maxs{-inf,-inf,-inf};
     for (auto& photon : array) {
-      mins.x = std::min (mins.x, photon.x);
-      mins.y = std::min (mins.y, photon.y);
-      mins.z = std::min (mins.z, photon.z);
-      maxs.x = std::max (maxs.x, photon.x);
-      maxs.y = std::max (maxs.y, photon.y);
-      maxs.z = std::max (maxs.z, photon.z);
+      mins.x = std::min (mins.x, photon.position.x);
+      mins.y = std::min (mins.y, photon.position.y);
+      mins.z = std::min (mins.z, photon.position.z);
+      maxs.x = std::max (maxs.x, photon.position.x);
+      maxs.y = std::max (maxs.y, photon.position.y);
+      maxs.z = std::max (maxs.z, photon.position.z);
     }
 
   /*fprintf (stderr, "mins: (%f %f %f) maxs: (%f %f %f)\n",
@@ -176,13 +184,13 @@ namespace RT {
 
   //if (end - begin > PhotonMap::maxLeaf) {
       Photon const* node = begin + (end - begin) / 2;
-      float const qd = norm2 (pos - node->position ());
+      float const qd = norm2 (pos - node->position);
 
       float planeDist = inf;
       switch (node->split) {
-        case Axis::X: planeDist = pos.x - node->x; break;
-        case Axis::Y: planeDist = pos.y - node->y; break;
-        case Axis::Z: planeDist = pos.z - node->z; break;
+        case Axis::X: planeDist = pos.x - node->position.x; break;
+        case Axis::Y: planeDist = pos.y - node->position.y; break;
+        case Axis::Z: planeDist = pos.z - node->position.z; break;
         default: assert (false); //"tried to treat photon map leaf as node!"
       }
 

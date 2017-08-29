@@ -26,10 +26,9 @@ project "raytoy"
 
   filter "configurations:profile"
     defines { "NDEBUG" }
-    optimize "On"
     symbols "On"
-    buildoptions { "-pg" }
-    linkoptions { "-pg" }
+    buildoptions { "-flto", "-O3", "-pg", "-no-pie" }
+    linkoptions { "-flto", "-O3", "-pg", "-no-pie" }
 
   buildoptions { "-std=c++14" }
 

@@ -8,7 +8,8 @@
 
 namespace RT {
   struct RGBE {
-    uint8_t r, g, b, e;
+    using Component = uint16_t;
+    Component r, g, b, e;
 
     RGBE () = default;
     RGBE (RGBE const&) = default;
@@ -19,7 +20,8 @@ namespace RT {
   };
 
   struct Octo {
-    int8_t s, t;
+    using Component = int16_t;
+    Component s, t;
 
     Octo () = default;
     Octo (Octo const&) = default;
@@ -32,23 +34,19 @@ namespace RT {
   enum class Axis : char { none, X, Y, Z };
 
   struct Photon {
-    float x, y, z;
+    Point position;
     RGBE powerPacked;
     Octo incomingPacked;
     Axis split;
-    char pad[1];
+    char pad[7];
 
     Photon () = default;
     Photon (Point p, Vector i, Colour c)
-      : x (p.x), y (p.y), z (p.z)
+      : position (p)
       , powerPacked (c)
       , incomingPacked (i)
       , split (Axis::none)
       { }
-
-    Point position () const {
-      return { x, y, z };
-    }
 
     Colour power () const {
       return static_cast<Colour> (powerPacked);
@@ -59,7 +57,7 @@ namespace RT {
     }
   };
 
-  static_assert (sizeof (Photon) == 20, "Photon miscompiled");
+  static_assert (sizeof (Photon) == 32, "Photon miscompiled");
 
   class NearSet {
   public:

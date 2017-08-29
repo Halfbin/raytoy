@@ -63,15 +63,15 @@ namespace RT {
   Vector Dielectric::bounceSpecular (RandBits& rng, Vector incident) const {
     float const
       c = std::abs (incident.z),
-      dir = (incident.z < 0.f)? 1.f : -1.f,
-      sqrtR0 = dir * (1.f - eta) / (1.f + eta),
+      dir = (incident.z < 0.f)? 1.f : -1.f;
+    /*sqrtR0 = dir * (1.f - eta) / (1.f + eta),
       R0 = sqrtR0 * sqrtR0,
       pReflect = fresnel (R0, c),
-      xi1 = canon (rng);
+      xi1 = canon (rng);*/
 
     Vector const reflection = incident*Vector{1,1,-1};
-    if (xi1 < pReflect)
-      return reflection;
+  /*if (xi1 < pReflect)
+      return reflection;*/
 
     float const
       r = (incident.z > 0.f)? eta : (1.f / eta),

@@ -9,8 +9,12 @@ namespace RT {
                 discrim = ds*ds - dd*(norm2(s) - radius*radius);
     if (discrim < 0.f) return { };
     float const root = std::sqrt(discrim),
-                tdd = -(ds + root);
-    if (tdd < 0.0001f) return { };
+                s1 = -root - ds,
+                s2 =  root - ds;
+    float tdd = std::min (s1, s2);
+    if (tdd < 0.f) tdd = std::max (s1, s2);
+    if (tdd < 0.f) return { };
+
     float const t = tdd / dd;
     Point const p = r.at(t);
     Vector const n = unit(p-centre);

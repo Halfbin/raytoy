@@ -22,11 +22,11 @@ namespace RT {
     int /*rtSamplesIndirect,
           rtSamplesDirect,
           directBranch,*/
-          nPhotons,
+        //nPhotons,
         //nNears,
           sqrtSamples,
           nPasses,
-        //nPhotonsPerPass,
+          nPhotonsPerPass,
           branch,
           nThreads;
     float //nearLimit,
@@ -169,7 +169,7 @@ namespace RT {
             rng,
             scene,
             xPixel, yPixel,
-            ray, opts.branch, 10
+            ray, 10, opts.branch
           );
         }
       }
@@ -193,15 +193,15 @@ namespace RT {
     auto nodes = tracePaths (opts, scene, cam, im.width (), im.height ());
 
     int const
-      nPhotonsPerPass = opts.nPhotons / opts.nPasses,
-      nPhotonsPerThread = nPhotonsPerPass / opts.nThreads,
+    //nPhotons          = opts.nPhotonsPerPass * opts.nPasses,
+      nPhotonsPerThread = opts.nPhotonsPerPass / opts.nThreads,
       nSamples = opts.sqrtSamples * opts.sqrtSamples;
 
     std::thread threads[opts.nThreads];
     std::mutex mutex;
     int nEmitted = 0;
 
-    std::vector<Photon> photonsRaw (nPhotonsPerPass);
+    std::vector<Photon> photonsRaw (opts.nPhotonsPerPass);
 
     Image<uint8_t> oldIm;
 
@@ -276,22 +276,27 @@ namespace RT {
 
       if (iPass > 0) {
         int maxDiff = 0;
+        float meanDiff = 0.f;
+        int nDiff = 0;
         for (int y = 0; y != im.height (); y++) {
           for (int x = 0; x != im.width (); x++) {
             auto pNew = im.at (x, y);
             auto pOld = oldIm.at (x, y);
-            maxDiff = std::max ({
-              maxDiff,
+            int maxThis = std::max ({
               std::abs ((int) pNew.r - pOld.r),
               std::abs ((int) pNew.g - pOld.g),
               std::abs ((int) pNew.b - pOld.b)
             });
+            meanDiff *= (float) nDiff / (float) (nDiff + 1);
+            meanDiff += maxThis * (1.f / (nDiff + 1));
+            nDiff++;
+            maxDiff = std::max (maxDiff, maxThis);
           }
         }
 
-        //fprintf (stderr, "\rmax diff: %i\n", maxDiff);
+        fprintf (stderr, "\rmean diff: %f\t\tmax diff: %i\n", meanDiff, maxDiff);
 
-        if (maxDiff == 0)
+        if (maxDiff < 2 && meanDiff < 0.5f)
           break;
       }
 
@@ -324,28 +329,28 @@ int main () {
   using namespace RT;
 
   Point const
-    eye    {0.4f, 0.f,-0.6f},
-    centre {0.3f, 0.f, 0.0f};
+    eye    {0.f, 0.f,-0.8f},
+    centre {0.f, 0.f, 0.0f};
   Vector const
     up     {0.f,-1.f, 0.f };
-  Camera cam (eye, centre, up, 0.4f);
+  Camera cam (eye, centre, up, 0.5f);
 
   Scene s;
 
   Lambertian const
-    mWhite  ({0.8f,0.8f,0.8f}),
-    mRed    ({0.8f,0.0f,0.0f}),
-    mGreen  ({0.0f,0.8f,0.0f}),
-    mYellow ({0.6f,0.6f,0.0f}),
-    mBlue   ({0.0f,0.0f,0.8f});
+    mWhite  ({ 0.8f, 0.8f, 0.8f }),
+    mRed    ({ 0.8f, 0.0f, 0.0f }),
+    mGreen  ({ 0.0f, 0.8f, 0.0f }),
+    mYellow ({ 0.6f, 0.6f, 0.0f }),
+    mBlue   ({ 0.0f, 0.0f, 0.8f });
 
-  Colour lamp { 16.f, 16.f, 16.f };
+  Colour lamp { 88.f, 80.f, 72.f };
 
   Plane const
     sLeftWall  ({ 1, 0, 0}, -1.5f),
     sRightWall ({-1, 0, 0}, -1.5f),
     sFloor     ({ 0,-1, 0}, -1.0f),
-    sCeiling   ({ 0, 1, 0}, -1.5f),
+    sCeiling   ({ 0, 1, 0}, -1.2f),
     sRearWall  ({ 0, 0,-1}, -3.0f),
     sFrontWall ({ 0, 0, 1}, -0.5f);
   Item const
@@ -356,7 +361,7 @@ int main () {
     rearWall  (s, &sRearWall,  &mWhite),
     frontWall (s, &sFrontWall, &mWhite);
 
-  Dielectric const mGlass ({0.2f,0.4f,1.f}, 1.458f);
+  Dielectric const mGlass ({0.6f,0.8f,1.f}, 1.458f);
   Mirror const mCu ({0.7, 0.2, 0.02});
 
   Sphere const sSphere ({0.2f,0.5f,1.8f}, 0.5f);
@@ -368,11 +373,11 @@ int main () {
   Sphere const sMarble ({-0.4f,0.65f,1.2f}, 0.35f);
   Item   const marble (s, &sMarble, &mGlass);
 
-  Sphere const sGlow ({-0.7f, 0.95f, 0.9f}, 0.05f);
-  Lum    const glow (s, &sGlow, lamp);
+  Sphere const sGlow ({-0.4f, 0.70f, 1.2f}, 0.05f);
+//Lum    const glow (s, &sGlow, lamp);
 
   Triangle const sTri ({-0.5f,-0.7f,2.9f}, {0.f,0.f,2.9f}, {0.5f,-0.7f,2.9f});
-  //Item     const tri (s, &sTri, &mWhite);
+//Item     const tri (s, &sTri, &mWhite);
 
 /*Triangle const
     uplumLeftShroudS  ({-1.5f,-0.2f,3.0f}, {-1.2f,-0.6f,3.0f}, {-1.5f,-0.6f,2.7f}),
@@ -386,17 +391,17 @@ int main () {
     uplumLeftTop  (s, &uplumLeftTopS,  lamp),
     uplumRightTop (s, &uplumRightTopS, lamp);*/
 
-/*Sphere const
-    lum1Surf ({ 0.7f, -1.3f, 2.3f}, 0.1f),
-    lum2Surf ({ 0.7f, -1.3f, 1.2f}, 0.1f),
-    lum3Surf ({-0.7f, -1.3f, 2.3f}, 0.1f),
-    lum4Surf ({-0.7f, -1.3f, 1.2f}, 0.1f);
+  Sphere const
+    lum1Surf ({ 0.7f, -1.0f, 2.3f}, 0.1f),
+    lum2Surf ({ 0.7f, -1.0f, 1.2f}, 0.1f),
+    lum3Surf ({-0.7f, -1.0f, 2.3f}, 0.1f),
+    lum4Surf ({-0.7f, -1.0f, 1.2f}, 0.1f);
 
   Lum const
     lum1 (s, &lum1Surf, lamp),
     lum2 (s, &lum2Surf, lamp),
     lum3 (s, &lum3Surf, lamp),
-    lum4 (s, &lum4Surf, lamp);*/
+    lum4 (s, &lum4Surf, lamp);
 
 #ifndef NDEBUG
   feenableexcept (FE_DIVBYZERO | FE_INVALID | FE_UNDERFLOW | FE_OVERFLOW);
@@ -406,19 +411,19 @@ int main () {
     wide = false;
 
   constexpr int const
-    scale = 2,
+    scale = 1,
     w0 = wide? 640 : 480,
     w = w0 * scale,
     h = 360 * scale;
   Image<uint8_t> im (w, h);
 
   Options opts;
-  opts.sqrtSamples = 2;
-  opts.branch = 80;
-  opts.initRadius = 0.5f;
-  opts.alpha = 0.95f;
-  opts.nPhotons = 640'000;
-  opts.nPasses  = 64;
+  opts.sqrtSamples = 5;
+  opts.branch = 1;
+  opts.initRadius = 0.1f;
+  opts.alpha = 0.9f;
+  opts.nPhotonsPerPass = 100'000;
+  opts.nPasses         = 100;
 /*opts.indirect = true;
   opts.rtSamplesIndirect = 1;
   opts.rtSamplesDirect = 4;

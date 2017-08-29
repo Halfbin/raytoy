@@ -5,11 +5,11 @@
 #include "scene.hpp"
 
 namespace RT {
-  Colour indirectTermPM
+/*Colour indirectTermPM
     ( NearSet& nears
     , PhotonMap const& map
     , RayHit<const Item*> hit
-    );
+    );*/
 
   int castPhotons
     ( RandBits& rng

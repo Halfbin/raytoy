@@ -4,7 +4,7 @@
 #include "scene.hpp"
 
 namespace RT {
-  Colour indirectTermPM
+/*Colour indirectTermPM
     ( NearSet& nears
     , PhotonMap const& map
     , RayHit<const Item*> hit
@@ -26,7 +26,7 @@ namespace RT {
       angle = 2.f * pi,
       area = pi * nears.maxQd ();
     return hit.occ->material->kDiffuse * power / (angle * area);
-  }
+  }*/
 
   Photon* tracePhoton
     ( RandBits& rng
