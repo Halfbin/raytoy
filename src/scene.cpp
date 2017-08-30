@@ -48,10 +48,7 @@ namespace RT {
 
     for (Item const* candidate : items) {
       auto const tryHit = candidate->surface->intersect (ray);
-      bool const
-        hitSource = tryHit.t < 0.001f,
-        nearer = tryHit.t < hit.t;
-      if (!hitSource && tryHit.t < hit.t)
+      if (tryHit.t >= 0.001f && tryHit.t < hit.t)
         hit = { tryHit.position, tryHit.t, tryHit.normal, candidate };
     }
 

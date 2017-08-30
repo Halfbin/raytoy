@@ -22,7 +22,16 @@ project "raytoy"
   filter "configurations:release"
     defines { "NDEBUG" }
   --optimize "Speed"
-    buildoptions { "-flto", "-O3", "-march=core-avx2" }
+    buildoptions {
+      "-flto",
+      "-O3",
+      "-fno-math-errno",
+      "-fno-signed-zeros",
+      "-fno-signaling-nans",
+      "-fno-trapping-math",
+      "-fcx-limited-range",
+      "-march=core-avx2"
+    }
 
   filter "configurations:profile"
     defines { "NDEBUG" }

@@ -52,23 +52,30 @@ namespace RT {
     RayHit<Surface const*> intersect (Ray r) const;
   };
 
-  struct Triangle : public BoundedSurface {
-    Point const p0;
-    Vector const abc, def;
-    Basis const basis;
+/*struct Paragram : public BoundedSurface {
+    Point const corner;
+    Vector const a, b;
+  };*/
 
-    Triangle (Point p, Point a, Point b);
+  struct Triangle : public BoundedSurface {
+    Point const p;
+    Vector const pa, pb, n;
+
+    Triangle (Point p, Point a, Point b)
+      : p (p), pa (a - p), pb (b - p)
+      , n (unit (cross (pa, pb)))
+      { }
 
     RayHit<Surface const*> intersect (Ray r) const;
     Ray randomEmission (RandBits& rng) const;
     Point randomPoint (RandBits& rng, Point) const;
 
     float area () const
-      { return dot (abc, def); }
+      { return dot (pa, pb); }
     float boundingRadius () const
-      { return norm ((abc + def) * (1.f/3.f)); }
+      { return norm ((pa + pb) * (1.f/3.f)); }
     Point boundingCentre () const
-      { return p0 - (abc + def) * (1.f/3.f); }
+      { return p + (pa + pb) * (1.f/3.f); }
   };
 }
 

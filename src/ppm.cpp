@@ -12,7 +12,14 @@ namespace RT {
   static float addPhoton (PathNode& node, Photon photon) {
     float const cosine = std::max (0.f, -dot (photon.incoming (), node.normal));
     node.tau += photon.power () * cosine * node.matDiffuse;
-    return cosine;
+    return 1.f;//cosine;
+  }
+
+  static float metric (PathNode const& node, Point pos, float k = 2.f) {
+    Vector const sep = pos - node.position;
+    float planeDist = dot (sep, node.normal);
+    Point const eff = pos + (k - 1.f) * planeDist * node.normal;
+    return norm2 (eff - node.position);
   }
 
   static float addPhotonsInRadius
@@ -26,14 +33,14 @@ namespace RT {
 
     if (end - begin < 16) {
       for (Photon const* photon = begin; photon != end; photon++) {
-        float const qd = norm2 (node.position - photon->position);
-        if (qd < r2)
+        float const d2 = metric (node, photon->position);
+        if (d2 >= 0.f && d2 < r2)
           added += addPhoton (node, *photon);
       }
     }
     else {
       Photon const* mid = begin + (end - begin) / 2;
-      float const qd = norm2 (node.position - mid->position);
+      float const d2 = metric (node, mid->position);
 
       float planeDist = inf;
       switch (mid->split) {
@@ -43,7 +50,7 @@ namespace RT {
         default: assert (false); //"tried to treat photon map leaf as node!"
       }
 
-      if (qd < r2)
+      if (d2 >= 0.f && d2 < r2)
         added += addPhoton (node, *mid);
       if (planeDist > 0.f || node.radius > planeDist)
         added += addPhotonsInRadius (mid+1, end, node);

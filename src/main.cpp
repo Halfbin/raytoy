@@ -108,6 +108,7 @@ namespace RT {
       Colour const newSourceK
         = (1.f/branch)
         * mat->correctRefl (Interaction::Type::specular, sourceK)
+        * mat->kSpecular
         * sourceK;
 
       for (int b = 0; b != branch; b++) {
@@ -132,8 +133,6 @@ namespace RT {
     , int w, int h
     )
   {
-    fprintf (stderr, "Tracing paths\n");
-
     float const
       xImToCam = 2.f / w,
       yImToCam = 2.f / h,
@@ -149,8 +148,10 @@ namespace RT {
 
     for (int yPixel = 0; yPixel != h; yPixel++) {
       int const progress
-        = int (yPixel * 100.f / h);
-      fprintf (stderr, "\r%3d%%", progress);
+        = (yPixel == h)
+          ? 100
+          : int (yPixel * 100.f / h);
+      fprintf (stderr, "\rTracing paths... %3d%%", progress);
 
       float const yPixelCentre = float(yPixel) + 0.5f;
 
@@ -175,7 +176,7 @@ namespace RT {
       }
     }
 
-    fprintf (stderr, "\r");
+    fprintf (stderr, "\n");
     return nodes;
   }
 
@@ -231,7 +232,6 @@ namespace RT {
       PhotonMap map (std::move (photonsRaw));
 
       // update
-      fprintf (stderr, "\rUpdating estimates...");
       int const nNodes = nodes.size ();
       int nodeProgress = 0;
 
@@ -243,6 +243,12 @@ namespace RT {
               int begin, end;
               {
                 std::lock_guard<std::mutex> lock (mutex);
+                int const progress
+                  = (nodeProgress == nNodes)
+                    ? 100
+                    : int (nodeProgress * 100.f / nNodes);
+                fprintf (stderr, "\rUpdating estimates... %3d%%", progress);
+
                 if (nodeProgress == nNodes)
                   return;
                 begin = nodeProgress;
@@ -274,9 +280,10 @@ namespace RT {
           im.at (x, y) = toSRGB (frame.at (x, y));
       }
 
+      int maxDiff = 0;
+      float meanDiff = 0.f;
+
       if (iPass > 0) {
-        int maxDiff = 0;
-        float meanDiff = 0.f;
         int nDiff = 0;
         for (int y = 0; y != im.height (); y++) {
           for (int x = 0; x != im.width (); x++) {
@@ -293,11 +300,6 @@ namespace RT {
             maxDiff = std::max (maxDiff, maxThis);
           }
         }
-
-        fprintf (stderr, "\rmean diff: %f\t\tmax diff: %i\n", meanDiff, maxDiff);
-
-        if (maxDiff < 2 && meanDiff < 0.5f)
-          break;
       }
 
       // update
@@ -306,7 +308,10 @@ namespace RT {
 
       // recycle
       photonsRaw = std::move (map.array);
-      fprintf (stderr, "\r                        \r");
+      fprintf (stderr, "\r                           \r");
+
+      if (iPass > 0 && maxDiff < 2 && meanDiff < 0.5f)
+        break;
     }
 
     auto stopTime = clock::now ();
@@ -346,7 +351,33 @@ int main () {
 
   Colour lamp { 88.f, 80.f, 72.f };
 
-  Plane const
+  Point const
+    pRUL { -1.5f, -1.2f,  3.0f },
+    pRUR {  1.5f, -1.2f,  3.0f },
+    pRLL { -1.5f,  1.0f,  3.0f },
+    pRLR {  1.5f,  1.0f,  3.0f },
+    pFUL { -1.5f, -1.2f, -0.5f },
+    pFUR {  1.5f, -1.2f, -0.5f },
+    pFLL { -1.5f,  1.0f, -0.5f },
+    pFLR {  1.5f,  1.0f, -0.5f };
+
+  Triangle const
+    sB1 (pRUL, pRLL, pRLR), sB2 (pRUL, pRLR, pRUR),
+    sF1 (pFUR, pFLR, pFLL), sF2 (pFUR, pFLL, pFUL),
+    sL1 (pFUL, pFLL, pRLL), sL2 (pFUL, pRLL, pRUL),
+    sR1 (pRUR, pRLR, pFLR), sR2 (pRUR, pFLR, pFUR),
+    sT1 (pFUL, pRUL, pRUR), sT2 (pFUL, pRUR, pFUR),
+    sD1 (pRLL, pFLL, pFLR), sD2 (pRLL, pFLR, pRLR);
+
+  Item const
+    B1 (s, &sB1, &mWhite), B2 (s, &sB2, &mWhite),
+    F1 (s, &sF1, &mWhite), F2 (s, &sF2, &mWhite),
+    L1 (s, &sL1, &mRed  ), L2 (s, &sL2, &mRed  ),
+    R1 (s, &sR1, &mBlue ), R2 (s, &sR2, &mBlue ),
+    T1 (s, &sT1, &mWhite), T2 (s, &sT2, &mWhite),
+    D1 (s, &sD1, &mWhite), D2 (s, &sD2, &mWhite);
+
+/*Plane const
     sLeftWall  ({ 1, 0, 0}, -1.5f),
     sRightWall ({-1, 0, 0}, -1.5f),
     sFloor     ({ 0,-1, 0}, -1.0f),
@@ -359,19 +390,21 @@ int main () {
     floor     (s, &sFloor,     &mWhite),
     ceiling   (s, &sCeiling,   &mWhite),
     rearWall  (s, &sRearWall,  &mWhite),
-    frontWall (s, &sFrontWall, &mWhite);
+    frontWall (s, &sFrontWall, &mWhite);*/
 
-  Dielectric const mGlass ({0.6f,0.8f,1.f}, 1.458f);
-  Mirror const mCu ({0.7, 0.2, 0.02});
+  Dielectric const mGlassR ({ 1.0f, 0.8f, 0.6f }, 1.458f);
+  Dielectric const mGlassG ({ 0.6f, 1.0f, 0.8f }, 1.458f);
+  Dielectric const mGlassB ({ 0.8f, 0.6f, 1.0f }, 1.458f);
+  Material const mCu ({0.28, 0.08, 0.008}, {0.35, 0.1, 0.001});
 
   Sphere const sSphere ({0.2f,0.5f,1.8f}, 0.5f);
-  Item   const sphere (s, &sSphere, &mWhite);
+  Item   const sphere (s, &sSphere, &mGlassR);
 
   Sphere const sCuBall ({0.65f,0.75f,1.3f}, 0.25f);
-  Item   const cuBall (s, &sCuBall, &mCu);
+  Item   const cuBall (s, &sCuBall, &mGlassG);
 
-  Sphere const sMarble ({-0.4f,0.65f,1.2f}, 0.35f);
-  Item   const marble (s, &sMarble, &mGlass);
+  Sphere const sMarble ({-0.4f, 0.65f,1.2f}, 0.35f);
+  Item   const marble (s, &sMarble, &mGlassB);
 
   Sphere const sGlow ({-0.4f, 0.70f, 1.2f}, 0.05f);
 //Lum    const glow (s, &sGlow, lamp);
@@ -411,17 +444,20 @@ int main () {
     wide = false;
 
   constexpr int const
-    scale = 1,
-    w0 = wide? 640 : 480,
+    hd720  = 4,
+    hd1080 = 6,
+
+    scale = 2,
+    w0 = wide? 320 : 240,
     w = w0 * scale,
-    h = 360 * scale;
+    h = 180 * scale;
   Image<uint8_t> im (w, h);
 
   Options opts;
-  opts.sqrtSamples = 5;
+  opts.sqrtSamples = 1;
   opts.branch = 1;
-  opts.initRadius = 0.1f;
-  opts.alpha = 0.9f;
+  opts.initRadius = 0.15f;
+  opts.alpha = 0.95f;
   opts.nPhotonsPerPass = 100'000;
   opts.nPasses         = 100;
 /*opts.indirect = true;

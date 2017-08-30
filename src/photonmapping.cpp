@@ -4,30 +4,6 @@
 #include "scene.hpp"
 
 namespace RT {
-/*Colour indirectTermPM
-    ( NearSet& nears
-    , PhotonMap const& map
-    , RayHit<const Item*> hit
-    )
-  {
-    map.nearest (nears, hit.position, hit.normal);
-    float const radius = std::sqrt (nears.maxQd ());
-    //fprintf (stderr, "radius %f\n", radius);
-
-    Colour power = black;
-    for (auto const& elem : nears) {
-      float const
-        cosine = std::max (0.f, -dot (elem.photon.incoming (), hit.normal)),
-        filter = 1.f;//3.f * (1.f - std::sqrt (elem.qd) / radius);
-      power += cosine * filter * elem.photon.power ();
-    }
-
-    float const
-      angle = 2.f * pi,
-      area = pi * nears.maxQd ();
-    return hit.occ->material->kDiffuse * power / (angle * area);
-  }*/
-
   Photon* tracePhoton
     ( RandBits& rng
     , Scene const& scene
