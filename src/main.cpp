@@ -18,62 +18,35 @@
 
 namespace RT {
   struct Options {
-  //bool  indirect;
-    int /*rtSamplesIndirect,
-          rtSamplesDirect,
-          directBranch,*/
-        //nPhotons,
-        //nNears,
-          sqrtSamples,
+    int   sqrtSamples,
           nPasses,
           nPhotonsPerPass,
           branch,
           nThreads;
-    float //nearLimit,
-          initRadius,
+    float initRadius,
           alpha;
   };
 
-  class SampleSet {
-    int const sqrtn;
-    Vector* const storage;
+  class Halton {
+    int i;
+    int const b;
 
   public:
-    SampleSet (int sqrtn) : sqrtn(sqrtn), storage(new Vector [sqrtn*sqrtn]) { }
-    ~SampleSet () { delete[] storage; }
-
-    void regen (RandBits& rng) {
-      int ys[sqrtn][sqrtn],
-          xs[sqrtn][sqrtn];
-      for (int i = 0; i != sqrtn; i++) {
-        std::iota    (ys[i], ys[i]+sqrtn, 0);
-        std::shuffle (ys[i], ys[i]+sqrtn, rng);
-        std::iota    (xs[i], xs[i]+sqrtn, 0);
-        std::shuffle (xs[i], xs[i]+sqrtn, rng);
+    Halton (int b, size_t seed = 1) : i ((int) seed), b (b) { }
+    float operator () () {
+      double f = 1., r = -0.5;
+      int n = i++;
+      while (n > 0) {
+        f /= b;
+        r += f * (i % b);
+        n /= b;
       }
-
-      float const k = 1.f / float(sqrtn);
-      for (int j = 0; j != sqrtn; j++) {
-        for (int i = 0; i != sqrtn; i++) {
-          int const dx = xs[i][j],
-                    dy = ys[j][i];
-          float const x = k*(float(i) + k*(float(dx) + .5f)) - .5f,
-                      y = k*(float(j) + k*(float(dy) + .5f)) - .5f;
-          storage[j*sqrtn + i] = {x,y,0};
-        }
-      }
+      return (float) r;
     }
-
-    Vector const* begin () const { return storage; }
-    Vector const* end   () const { return storage + size(); }
-    size_t size () const { return sqrtn*sqrtn; }
-
-    Vector operator[] (int i) { return storage[i]; }
   };
 
   void tracePath
     ( std::vector<PathNode>& nodes
-    , float initRadius
     , RandBits& rng
     , Scene const& scene
     , int xPixel, int yPixel
@@ -95,11 +68,10 @@ namespace RT {
 
     if (mat->kDiffuse != black) {
       PathNode node
-        ( hit.position, hit.normal
+        ( xPixel, yPixel
+        , hit.position, hit.normal
         , mat
-        , xPixel, yPixel
         , sourceK
-        , initRadius
         );
       nodes.push_back (node);
     }
@@ -115,7 +87,7 @@ namespace RT {
         Vector const bounce = tang.outOf (mat->bounceSpecular (rng, incident));
         Ray const newRay (hit.position, bounce);
         tracePath
-          ( nodes, initRadius
+          ( nodes
           , rng
           , scene
           , xPixel, yPixel
@@ -129,6 +101,7 @@ namespace RT {
   std::vector<PathNode> tracePaths
     ( Options const& opts
     , Scene const& scene
+    , RandBits& rng
     , Camera const& camera
     , int w, int h
     )
@@ -140,8 +113,8 @@ namespace RT {
 
     int const nSamples = opts.sqrtSamples * opts.sqrtSamples;
 
-    RandBits rng = threadRNG ();
-    SampleSet samplePosns (opts.sqrtSamples);
+    Halton h2 (17, rng ()),
+           h3 (5, rng ());
 
     std::vector<PathNode> nodes;
     nodes.reserve (nSamples * w * h);
@@ -158,15 +131,16 @@ namespace RT {
       for (int xPixel = 0; xPixel != w; xPixel++) {
         float const xPixelCentre = float(xPixel) + 0.5f;
 
-        samplePosns.regen (rng);
+      //samplePosns.regen (rng);
         for (int i = 0; i != nSamples; i++) {
-          Vector const samplePos = samplePosns[i];
+        //Vector const samplePos = samplePosns[i];
+          Vector const samplePos { h2 (), h3 (), 0.f };
           float const
             xSample = (xPixelCentre + samplePos.x)*xImToCam - 1.f,
             ySample = (yPixelCentre + samplePos.y)*yImToCam - 1.f;
           Ray const ray = camera.shoot (aspect * xSample, ySample);
           tracePath (
-            nodes, opts.initRadius,
+            nodes,
             rng,
             scene,
             xPixel, yPixel,
@@ -183,15 +157,18 @@ namespace RT {
   void render
     ( Scene const& scene
     , Camera const& cam
-    , Image<uint8_t>& im
+    , Image<RGB<uint8_t>>& im
     , Monitor& mon
     , Options const& opts
     )
   {
+    RandBits rng = threadRNG ();
+
     using clock = std::chrono::steady_clock;
     auto startTime = clock::now ();
 
-    auto nodes = tracePaths (opts, scene, cam, im.width (), im.height ());
+    float const initR2 = opts.initRadius * opts.initRadius;
+    Image<Stats> statsAll (im.width (), im.height (), Stats (initR2));
 
     int const
     //nPhotons          = opts.nPhotonsPerPass * opts.nPasses,
@@ -204,13 +181,13 @@ namespace RT {
 
     std::vector<Photon> photonsRaw (opts.nPhotonsPerPass);
 
-    Image<uint8_t> oldIm;
+    Image<RGB<uint8_t>> oldIm;
 
     for (int iPass = 0; iPass != opts.nPasses; iPass++) {
       fprintf (stderr, "Pass %i/%i\n", iPass+1, opts.nPasses);
 
       // cast
-      fprintf (stderr, "Casting...");
+      fprintf (stderr, "Casting...\n");
       for (int iThread = 0; iThread != opts.nThreads; iThread++) {
         auto& thread = threads[iThread];
         thread = std::thread (
@@ -228,12 +205,16 @@ namespace RT {
         thread.join ();
 
       // build tree
-      fprintf (stderr, "\rBuilding tree...");
+      fprintf (stderr, "Building tree...\n");
       PhotonMap map (std::move (photonsRaw));
 
-      // update
+      // trace
+      auto nodes = tracePaths (opts, scene, rng, cam, im.width (), im.height ());
+
+      // gather
       int const nNodes = nodes.size ();
       int nodeProgress = 0;
+      std::vector<Gather> gathers (nNodes);
 
       for (int iThread = 0; iThread != opts.nThreads; iThread++) {
         auto& thread = threads[iThread];
@@ -255,8 +236,11 @@ namespace RT {
                 end = nodeProgress = std::min (nodeProgress + 100, nNodes);
               }
 
-              for (int i = begin; i != end; i++)
-                nodes[i].update (map, opts.alpha);
+              for (int i = begin; i != end; i++) {
+                auto const& node = nodes[i];
+                auto const& stats = statsAll.at (node.px, node.py);
+                gathers[i] = node.gather (stats.r2, map);
+              }
             }
           }
         );
@@ -265,13 +249,24 @@ namespace RT {
       for (auto& thread : threads)
         thread.join ();
 
-      // gather
-      Image<float> frame (im.width (), im.height ());
+      fprintf (stderr, "\n");
+
+      // collect
+      for (auto g : gathers)
+        statsAll.at (g.px, g.py).add (g.contrib, g.nPhotons);
+
+      // update
+      for (auto& stats : statsAll)
+        stats.update (opts.alpha);
+
+      // compose
+      Image<Colour> frame (im.width (), im.height ());
       float const sampleK = 1.f / float (nSamples * nEmitted);
-      for (auto const& node : nodes) {
-        auto L = sampleK * node.radiance ();
-        //fprintf (stderr, "L: (%.3f %.3f %.3f)\n", L.r, L.g, L.b);
-        frame.at (node.px, node.py) += {L.r, L.g, L.b};
+      for (int y = 0; y != im.height (); y++) {
+        for (int x = 0; x != im.width (); x++) {
+          auto L = sampleK * statsAll.at (x, y).radiance ();
+          frame.at (x, y) += L;
+        }
       }
 
       // ramp
@@ -322,10 +317,10 @@ namespace RT {
     fprintf (stderr, "Emitted %i\n", nEmitted);
   }
 
-  void writePPM (char const* path, Image<uint8_t> const& im) {
+  void writePPM (char const* path, Image<RGB<uint8_t>> const& im) {
     FILE* f = fopen (path, "wb");
     fprintf (f, "P6\n%d %d\n255\n", im.width(), im.height());
-    fwrite (im.raw(), sizeof(Pixel<uint8_t>), im.size(), f);
+    fwrite (im.raw(), sizeof(RGB<uint8_t>), im.size(), f);
     fclose (f);
   }
 }
@@ -451,14 +446,14 @@ int main () {
     w0 = wide? 320 : 240,
     w = w0 * scale,
     h = 180 * scale;
-  Image<uint8_t> im (w, h);
+  Image<RGB<uint8_t>> im (w, h);
 
   Options opts;
-  opts.sqrtSamples = 1;
+  opts.sqrtSamples = 5;
   opts.branch = 1;
-  opts.initRadius = 0.15f;
-  opts.alpha = 0.95f;
-  opts.nPhotonsPerPass = 100'000;
+  opts.initRadius = 0.04f;
+  opts.alpha = 0.9f;
+  opts.nPhotonsPerPass = 2'000'000;
   opts.nPasses         = 100;
 /*opts.indirect = true;
   opts.rtSamplesIndirect = 1;

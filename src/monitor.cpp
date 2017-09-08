@@ -37,7 +37,7 @@ namespace RT {
     delete impl;
   }
 
-  void Monitor::update (Image<uint8_t> const& image) {
+  void Monitor::update (Image<RGB<uint8_t>> const& image) {
     SDL_PumpEvents ();
 
     int w, h;
@@ -59,7 +59,7 @@ namespace RT {
     }
 
     auto src = SDL_CreateRGBSurfaceWithFormatFrom
-      ( const_cast<Pixel<uint8_t>*> (image.raw ())
+      ( const_cast<RGB<uint8_t>*> (image.raw ())
       , image.width (), image.height ()
       , 24
       , image.width () * 3

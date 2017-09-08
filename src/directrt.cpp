@@ -31,7 +31,7 @@ namespace RT {
       }
     }
 
-    return mat->kDiffuse * (total / branch)
+    return mat->kDiffuse * (total / (float) branch)
          + mat->emission / (2.f * pi);
   }
 }

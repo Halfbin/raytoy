@@ -10,26 +10,55 @@
 #include <cstdio>
 
 namespace RT {
+  struct Stats {
+    float r2;
+    int nPhotons, dn;
+    Colour tau;
+
+    explicit Stats (float r2)
+      : r2 (r2), nPhotons (0), dn (0), tau (black)
+      { }
+
+    Colour radiance () const {
+      constexpr float const twoPi2 = 2.f * pi * pi;
+      return tau / (twoPi2 * r2);
+    }
+
+    void add (Colour, int dn);
+    void update (float alpha);
+  };
+
+  struct Gather {
+    int px, py;
+    Colour contrib;
+    int nPhotons;
+
+    Gather () = default;
+    Gather (int px, int py)
+      : px (px), py (py)
+      , contrib (black), nPhotons (0)
+      { }
+    Gather (Gather const&) = default;
+    Gather& operator = (Gather const&) = default;
+  };
+
   struct PathNode {
+    int px, py;
     Point position;
     Vector normal;
     Colour matDiffuse;
-    short px, py;
     Colour k;
-    float radius;
-    float nPhotons;
-    Colour tau;
 
     PathNode
-      ( Point p, Vector n
+      ( int px, int py
+      , Point p, Vector n
       , Material const* m
-      , int px, int py, Colour k
-      , float r
+      , Colour k
       )
-      : position (p), normal (n)
+      : px (px), py (py)
+      , position (p), normal (n)
       , matDiffuse (m->kDiffuse)
-      , px (px), py (py), k (k)
-      , radius (r), nPhotons (0.f), tau (black)
+      , k (k)
       { }
 
     PathNode (PathNode const&) = default;
@@ -37,12 +66,7 @@ namespace RT {
     PathNode (PathNode&&) = default;
     PathNode& operator = (PathNode&&) = default;
 
-    Colour radiance () const {
-      constexpr float const twoPi2 = 2.f * pi * pi;
-      return k * tau / (twoPi2 * radius * radius);
-    }
-
-    void update (PhotonMap const&, float alpha);
+    Gather gather (float r2, PhotonMap const&) const;
   };
 }
 

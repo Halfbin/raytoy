@@ -1,42 +1,65 @@
 #pragma once
 
 #include <algorithm>
+#include <type_traits>
 
 namespace RT {
   enum Black { black };
 
-  struct Colour {
-    float r, g, b;
+  template<typename X>
+  struct RGB {
+    X r, g, b;
 
-    Colour () = default;
-    constexpr Colour (Black) : r(0), g(0), b(0) { }
-    constexpr Colour (float r, float g, float b) : r(r), g(g), b(b) { }
-    Colour (Colour const&) = default;
+    RGB () = default;
+    constexpr RGB (Black) : r(0), g(0), b(0) { }
+    constexpr RGB (X r, X g, X b) : r(r), g(g), b(b) { }
+    RGB (RGB const&) = default;
 
     explicit operator bool () const { return *this != black; }
-    bool operator== (Colour const& other) const
+    bool operator== (RGB const& other) const
       { return r==other.r && g==other.g && b==other.b; }
-    bool operator!= (Colour const& other) const { return !(*this == other); }
+    bool operator!= (RGB const& other) const { return !(*this == other); }
   };
 
-  static inline Colour operator* (Colour a, Colour b) { return {a.r*b.r, a.g*b.g, a.b*b.b}; }
-  static inline Colour operator* (Colour c, float k) { return {c.r*k, c.g*k, c.b*k}; }
-  static inline Colour operator* (float k, Colour c) { return c*k; }
-  static inline Colour operator/ (Colour c, float k) { return {c.r/k, c.g/k, c.b/k}; }
-  static inline Colour operator+ (Colour a, Colour b) { return {a.r+b.r, a.g+b.g, a.b+b.b}; }
+  template<typename X>
+  static inline RGB<X> operator* (RGB<X> a, RGB<X> b)
+    { return {a.r*b.r, a.g*b.g, a.b*b.b}; }
+  template<typename X>
+  static inline RGB<X> operator* (RGB<X> c, X k)
+    { return {c.r*k, c.g*k, c.b*k}; }
+  template<typename X>
+  static inline RGB<X> operator* (X k, RGB<X> c)
+    { return c*k; }
+  template<typename X>
+  static inline RGB<X> operator/ (RGB<X> c, X k)
+    { return {c.r/k, c.g/k, c.b/k}; }
+  template<typename X>
+  static inline RGB<X> operator+ (RGB<X> a, RGB<X> b)
+    { return {a.r+b.r, a.g+b.g, a.b+b.b}; }
 
-  static inline Colour& operator += (Colour& a, Colour b) { return (a = a+b); }
-  static inline Colour& operator *= (Colour& a, Colour b) { return (a = a*b); }
-  static inline Colour& operator *= (Colour& c, float k) { return (c = k*c); }
+  template<typename X>
+  static inline RGB<X>& operator += (RGB<X>& a, RGB<X> b)
+    { return (a = a+b); }
+  template<typename X>
+  static inline RGB<X>& operator *= (RGB<X>& a, RGB<X> b)
+    { return (a = a*b); }
+  template<typename X>
+  static inline RGB<X>& operator *= (RGB<X>& c, X k)
+    { return (c = k*c); }
 
-  static inline float max (Colour c) { return std::max (c.r, std::max (c.g, c.b)); }
+  template<typename X>
+  static inline X max (RGB<X> c)
+    { return std::max ({c.r, c.g, c.b}); }
 
-  static inline Colour clamp (Colour c) {
-    return Colour
-      { std::max (0.f, std::min (1.f, c.r))
-      , std::max (0.f, std::min (1.f, c.g))
-      , std::max (0.f, std::min (1.f, c.b))
+  template<typename X, typename = std::enable_if_t<std::is_floating_point_v<X>>>
+  static inline RGB<X> clamp (RGB<X> c) {
+    return RGB<X>
+      { std::max ((X) 0, std::min ((X) 1, c.r))
+      , std::max ((X) 0, std::min ((X) 1, c.g))
+      , std::max ((X) 0, std::min ((X) 1, c.b))
       };
   }
+
+  using Colour = RGB<float>;
 }
 

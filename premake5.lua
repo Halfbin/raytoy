@@ -39,5 +39,6 @@ project "raytoy"
     buildoptions { "-flto", "-O3", "-pg", "-no-pie" }
     linkoptions { "-flto", "-O3", "-pg", "-no-pie" }
 
-  buildoptions { "-std=c++14" }
+  filter "configurations:*"
+    buildoptions { "-std=c++17" }
 

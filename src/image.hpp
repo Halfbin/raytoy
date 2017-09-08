@@ -7,35 +7,18 @@
 #include <cmath>
 
 namespace RT {
-  template<typename X>
-  struct Pixel {
-    X r, g, b;
-    Pixel () = default;
-    constexpr Pixel (Black) : r(0), g(0), b(0) { }
-    constexpr Pixel (X r, X g, X b) : r(r), g(g), b(b) { }
-    Pixel (Pixel const&) = default;
-  };
-
-  template<typename X>
-  Pixel<X>& operator += (Pixel<X>& onto, Pixel<X> other) {
-    onto.r += other.r;
-    onto.g += other.g;
-    onto.b += other.b;
-    return onto;
-  }
-
-  template<typename X>
+  template<typename Pixel>
   class Image {
     int wide, high;
-    std::vector<Pixel<X>> pixels;
+    std::vector<Pixel> pixels;
 
   public:
     Image ()
       : wide (0), high (0)
     { }
-    Image (int w, int h)
+    Image (int w, int h, Pixel init = Pixel ())
       : wide (w), high (h)
-      , pixels (size (), black)
+      , pixels (size (), init)
     { }
     Image (Image&& other)
       : wide (std::exchange (other.wide, 0))
@@ -68,13 +51,22 @@ namespace RT {
     int height () const { return high; }
     size_t size () const { return wide * high; }
 
-    Pixel<X> const* raw () const { return pixels.data (); }
+    Pixel*       raw ()       { return pixels.data (); }
+    Pixel const* raw () const { return pixels.data (); }
 
-    Pixel<X>& at (int x, int y)       { return pixels [y * wide + x]; }
-    Pixel<X>  at (int x, int y) const { return pixels [y * wide + x]; }
+    Pixel&       at (int x, int y)       { return pixels [y * wide + x]; }
+    Pixel const& at (int x, int y) const { return pixels [y * wide + x]; }
+
+    Pixel*       begin ()       { return raw (); }
+    Pixel const* begin () const { return raw (); }
+    Pixel*       end   ()       { return begin () + size (); }
+    Pixel const* end   () const { return begin () + size (); }
+
+    Pixel const* cbegin () const { return begin (); }
+    Pixel const* cend   () const { return end (); }
   };
 
-  template<typename X>
+/*template<typename X>
   static Image<X>& operator += (Image<X>& onto, Image<X> const& other) {
     int const
       w = std::min (onto.width (), other.width ()),
@@ -84,7 +76,7 @@ namespace RT {
         onto.at (x, y) += other.at (x, y);
     }
     return onto;
-  }
+  }*/
 
   static inline float toSRGB1 (float raw) {
     float const
@@ -98,7 +90,7 @@ namespace RT {
     return uint8_t (255.f * x);
   }
 
-  static inline Pixel<uint8_t> toSRGB (Pixel<float> c) {
+  static inline RGB<uint8_t> toSRGB (Colour c) {
     return
       { toU8 (toSRGB1 (c.r))
       , toU8 (toSRGB1 (c.g))

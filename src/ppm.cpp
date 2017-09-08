@@ -9,10 +9,9 @@
 #include <cfloat>
 
 namespace RT {
-  static float addPhoton (PathNode& node, Photon photon) {
+  static Colour addPhoton (PathNode const& node, Photon photon) {
     float const cosine = std::max (0.f, -dot (photon.incoming (), node.normal));
-    node.tau += photon.power () * cosine * node.matDiffuse;
-    return 1.f;//cosine;
+    return node.k * photon.power () * cosine * node.matDiffuse;
   }
 
   static float metric (PathNode const& node, Point pos, float k = 2.f) {
@@ -22,25 +21,29 @@ namespace RT {
     return norm2 (eff - node.position);
   }
 
-  static float addPhotonsInRadius
-    ( Photon const* begin, Photon const* end
-    , PathNode& node
+  static void addPhotonsInRadius
+    ( Gather& g, float r2
+    , Photon const* begin, Photon const* end
+    , PathNode const& node
     )
   {
-    float added = 0;
-
-    float const r2 = node.radius * node.radius;
-
     if (end - begin < 16) {
       for (Photon const* photon = begin; photon != end; photon++) {
         float const d2 = metric (node, photon->position);
-        if (d2 >= 0.f && d2 < r2)
-          added += addPhoton (node, *photon);
+        if (d2 >= 0.f && d2 < r2) {
+          g.contrib += addPhoton (node, *photon);
+          g.nPhotons++;
+        }
       }
     }
     else {
       Photon const* mid = begin + (end - begin) / 2;
       float const d2 = metric (node, mid->position);
+
+      if (d2 >= 0.f && d2 < r2) {
+        g.contrib += addPhoton (node, *mid);
+        g.nPhotons++;
+      }
 
       float planeDist = inf;
       switch (mid->split) {
@@ -49,35 +52,41 @@ namespace RT {
         case Axis::Z: planeDist = node.position.z - mid->position.z; break;
         default: assert (false); //"tried to treat photon map leaf as node!"
       }
+      float const planeD2 = planeDist * planeDist;
 
-      if (d2 >= 0.f && d2 < r2)
-        added += addPhoton (node, *mid);
-      if (planeDist > 0.f || node.radius > planeDist)
-        added += addPhotonsInRadius (mid+1, end, node);
-      if (planeDist < 0.f || node.radius > planeDist)
-        added += addPhotonsInRadius (begin, mid, node);
+      if (planeDist > 0.f || r2 > planeD2)
+        addPhotonsInRadius (g, r2, mid+1, end, node);
+      if (planeDist < 0.f || r2 > planeD2)
+        addPhotonsInRadius (g, r2, begin, mid, node);
     }
-
-    return added;
   }
 
-  void PathNode::update (PhotonMap const& map, float alpha) {
-    float const
-      dn = addPhotonsInRadius (map.begin (), map.end (), *this);
-    if (dn == 0.f)
+  Gather PathNode::gather (float r2, PhotonMap const& map) const {
+    Gather g (px, py);
+    addPhotonsInRadius (g, r2, map.begin (), map.end (), *this);
+    return g;
+  }
+
+  void Stats::add (Colour contrib, int n) {
+    tau += contrib;
+    dn += n;
+  }
+
+  void Stats::update (float alpha) {
+    if (dn == 0)
       return;
 
     float const ratio
       = (nPhotons + alpha * dn)
       / (nPhotons +         dn);
 
-    //fprintf (stderr, "r: %f, rat: %f\n", radius, ratio);
-    radius *= std::sqrt (ratio);
-  //radius = std::max (radius, limit);
-    if (radius == 0.f || ratio >= 1.f)
+    r2 *= ratio;
+    if (r2 <= 1e-8f || ratio >= 1.f)
       fprintf (stderr, "ugh\n");
     tau *= ratio;
     nPhotons += alpha * dn;
+
+    dn = 0;
   }
 }
 

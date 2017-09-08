@@ -14,7 +14,7 @@ namespace RT {
 
     Monitor (Monitor const&) = delete;
 
-    void update (Image<uint8_t> const&);
+    void update (Image<RGB<uint8_t>> const&);
   };
 }
 

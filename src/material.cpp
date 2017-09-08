@@ -68,7 +68,7 @@ namespace RT {
       dir = (incident.z < 0.f)? 1.f : -1.f,
       sqrtR0 = dir * (1.f - eta) / (1.f + eta),
       R0 = sqrtR0 * sqrtR0,
-      pReflect = fresnel (R0, c),
+      pReflect = 0.f,//fresnel (R0, c),
       xi1 = canon (rng);
 
     Vector const reflection = incident*Vector{1,1,-1};
